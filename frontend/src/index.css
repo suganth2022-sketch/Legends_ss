@@ -1,0 +1,195 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply bg-paper text-ink font-sans antialiased;
+  }
+
+  h1, h2, h3 {
+    @apply font-display;
+  }
+
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: #FAF8F6;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: #C8102E;
+    border-radius: 3px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: #E8203F;
+  }
+}
+
+@layer components {
+  /* Cards */
+  .card {
+    @apply bg-paper-card border border-line rounded-2xl p-6 shadow-card;
+  }
+
+  .card-hover {
+    @apply card transition-all duration-300;
+  }
+
+  .card-hover:hover {
+    @apply shadow-card-hover;
+    border-color: rgba(200, 16, 46, 0.25);
+    transform: translateY(-2px);
+  }
+
+  /* Buttons */
+  .btn-primary {
+    @apply px-6 py-3 rounded-xl font-bold text-white transition-all duration-200;
+    background: linear-gradient(135deg, #E8203F 0%, #8B0F24 100%);
+    box-shadow: 0 8px 20px -8px rgba(200, 16, 46, 0.5);
+  }
+
+  .btn-primary:hover {
+    box-shadow: 0 10px 24px -6px rgba(200, 16, 46, 0.6);
+    transform: translateY(-1px);
+  }
+
+  .btn-primary:active {
+    transform: translateY(0);
+  }
+
+  .btn-secondary {
+    @apply px-6 py-3 rounded-xl font-bold text-ink-soft border-2 border-line bg-white transition-all duration-200;
+  }
+
+  .btn-secondary:hover {
+    @apply text-brand-red border-brand-red;
+  }
+
+  .btn-gold {
+    @apply px-6 py-3 rounded-xl font-bold text-white transition-all duration-200;
+    background: linear-gradient(135deg, #C89A3F 0%, #A87C1F 100%);
+    box-shadow: 0 4px 15px rgba(168, 124, 31, 0.3);
+  }
+
+  .btn-gold:hover {
+    box-shadow: 0 6px 20px rgba(168, 124, 31, 0.45);
+    transform: translateY(-1px);
+  }
+
+  .btn-danger {
+    @apply px-6 py-3 rounded-xl font-bold border-2 transition-all duration-200;
+    color: #A23B34;
+    border-color: #A23B34;
+    background: #F7E4E1;
+  }
+
+  /* Badges */
+  .badge {
+    @apply inline-flex items-center px-3 py-1 rounded-full text-xs font-bold;
+  }
+
+  .badge-red {
+    @apply badge;
+    background: #FDF1F1;
+    color: #C8102E;
+    border: 1px solid rgba(200, 16, 46, 0.25);
+  }
+
+  .badge-gold {
+    @apply badge bg-gold-soft text-gold border border-gold/30;
+  }
+
+  .badge-green {
+    @apply badge;
+    background: #E4F3EA;
+    color: #16743F;
+  }
+
+  .badge-amber {
+    @apply badge;
+    background: #FBEBD3;
+    color: #B4720F;
+  }
+
+  .badge-gray {
+    @apply badge bg-paper text-ink-faint border border-line;
+  }
+
+  /* Input fields */
+  .input {
+    @apply w-full px-4 py-3 rounded-xl text-ink outline-none transition-all duration-200 bg-white border-2 border-line;
+  }
+
+  .input::placeholder {
+    color: #9C948C;
+  }
+
+  .input:focus {
+    border-color: #C8102E;
+    box-shadow: 0 0 0 3px rgba(200, 16, 46, 0.12);
+  }
+
+  /* Nav item (Member Portal — white sidebar, red active state) */
+  .nav-item {
+    @apply flex items-center gap-3 px-4 py-3 rounded-xl text-ink-soft font-semibold transition-all duration-200 cursor-pointer;
+  }
+
+  .nav-item:hover {
+    @apply bg-paper text-ink;
+  }
+
+  .nav-item.active {
+    @apply text-white;
+    background: linear-gradient(135deg, #E8203F 0%, #8B0F24 100%);
+    box-shadow: 0 6px 16px -8px rgba(200, 16, 46, 0.5);
+  }
+
+  /* Admin nav item (dark maroon sidebar, gold active state) */
+  .admin-nav-item {
+    @apply flex items-center gap-3 px-4 py-3 rounded-xl font-semibold transition-all duration-200 cursor-pointer;
+    color: #C9BDBB;
+  }
+
+  .admin-nav-item:hover {
+    color: #fff;
+    background: rgba(255, 255, 255, 0.05);
+  }
+
+  .admin-nav-item.active {
+    background: rgba(200, 154, 63, 0.16);
+    color: #E3C983;
+  }
+
+  /* Table */
+  .data-table {
+    @apply w-full border-collapse;
+  }
+
+  .data-table th {
+    @apply px-4 py-3 text-left text-xs font-bold text-ink-faint uppercase tracking-wider;
+  }
+
+  .data-table td {
+    @apply px-4 py-3 text-sm text-ink border-t border-line;
+  }
+
+  /* Divider */
+  .divider {
+    @apply border-t border-line my-4;
+  }
+}

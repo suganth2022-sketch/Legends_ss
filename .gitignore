@@ -1,0 +1,40 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+dist-ssr/
+build/
+
+# Environment / secrets
+.env
+.env.local
+.env.*.local
+*.env
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+
+# Editor / OS
+.vscode/*
+!.vscode/extensions.json
+.idea/
+.DS_Store
+Thumbs.db
+*.suo
+*.sw?
+
+# Prisma
+prisma/*.db
+
+# Claude Code local (per-developer) settings
+.claude/settings.local.json
+
+# Misc
+*.local
+coverage/
+.cache/
