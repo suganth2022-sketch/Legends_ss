@@ -20,6 +20,7 @@ import { AdminService } from './admin.service';
 import { ListAuditLogsQueryDto } from './dto/list-audit-logs-query.dto';
 import { ListCommissionsQueryDto } from './dto/list-commissions-query.dto';
 import { ListMembersQueryDto } from './dto/list-members-query.dto';
+import { ListMembersSummaryQueryDto } from './dto/list-members-summary-query.dto';
 import { ListPaymentsQueryDto } from './dto/list-payments-query.dto';
 import { ListPayoutsReportQueryDto } from './dto/list-payouts-report-query.dto';
 import { UpdateMemberStatusDto } from './dto/update-member-status.dto';
@@ -79,6 +80,37 @@ export class AdminController {
   ) {
     this.assertAdmin(req);
     return this.adminService.getMemberPayouts(id, query);
+  }
+
+  @ApiOperation({ summary: "Admin drill-down into any member's payment history" })
+  @Audited('ADMIN_VIEWED_MEMBER_PAYMENTS', 'Member')
+  @UseInterceptors(AuditInterceptor)
+  @Get('members/:id/payments')
+  async getMemberPayments(@Param('id') id: string, @Request() req: any) {
+    this.assertAdmin(req);
+    return this.adminService.getMemberPayments(id);
+  }
+
+  @ApiOperation({
+    summary:
+      "Admin view of a member's full profile: personal details, KYC/bank status (masked — decrypting stays member self-service only), and nominee",
+  })
+  @Audited('ADMIN_VIEWED_MEMBER_PROFILE', 'Member')
+  @UseInterceptors(AuditInterceptor)
+  @Get('members/:id/full-profile')
+  async getMemberFullProfile(@Param('id') id: string, @Request() req: any) {
+    this.assertAdmin(req);
+    return this.adminService.getMemberFullProfile(id);
+  }
+
+  @ApiOperation({
+    summary:
+      'One row per member: total payments made, total commission earned, total paid out, live balance — filterable by a total-earnings range',
+  })
+  @Get('members-summary')
+  async listMembersSummary(@Query() query: ListMembersSummaryQueryDto, @Request() req: any) {
+    this.assertAdmin(req);
+    return this.adminService.listMembersSummary(query);
   }
 
   @ApiOperation({ summary: 'All payments across all members, filterable' })

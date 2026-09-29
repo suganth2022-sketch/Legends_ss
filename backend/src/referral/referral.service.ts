@@ -14,6 +14,11 @@ export interface GenealogyRow {
   totalTeamCount: number;
 }
 
+interface DownlineEdge {
+  id: string;
+  sponsorId: string | null;
+}
+
 @Injectable()
 export class ReferralService {
   constructor(private readonly prisma: PrismaService) {}
@@ -52,77 +57,108 @@ export class ReferralService {
     }
   }
 
-  // Recursive CTE downline traversal, capped at 10 levels per the SRS
-  // (unlimited direct referrals per sponsor, but commission-relevant depth
-  // stops at level 10). Level is computed from query depth, never stored.
+  // Downline traversal. Two things used to be conflated in one expensive
+  // query: the DISPLAYED list (capped at 10 levels, per the SRS commission-
+  // relevant depth) and the true, unlimited-depth team-size counts (the SRS
+  // separately requires unlimited direct referrals). The previous version
+  // ran a full recursive sub-query PER ROW to get an uncapped count, which
+  // is O(n) extra recursive queries for an n-row downline — genuinely slow
+  // as a network grows.
   //
-  // committedAmount comes from payment_plans (that table already exists);
-  // advancePaid/paymentStatus per calendar month are intentionally omitted
-  // here until the Payments module exists to populate real payment rows.
+  // This version runs exactly one recursive CTE (uncapped, id/sponsorId
+  // only — cheap) to get the whole real network, computes level/direct/team
+  // counts for every node in plain JS in one pass, then fetches display
+  // fields (name, doj, status, plan amount) with two batched queries scoped
+  // only to the <=10-level rows that actually get returned — no per-row
+  // queries at all.
   async getGenealogy(rootMemberId: string): Promise<GenealogyRow[]> {
-    const rows = await this.prisma.$queryRaw<GenealogyRow[]>`
-      WITH RECURSIVE downline AS (
-        SELECT
-          m.id,
-          m.member_code AS "memberCode",
-          m.full_name AS "fullName",
-          m.doj,
-          m.status,
-          m.sponsor_id,
-          1 AS level
-        FROM members m
-        WHERE m.sponsor_id = ${rootMemberId}
+    const [root, edges] = await Promise.all([
+      this.prisma.member.findUnique({ where: { id: rootMemberId }, select: { memberCode: true } }),
+      this.prisma.$queryRaw<DownlineEdge[]>`
+        WITH RECURSIVE downline AS (
+          SELECT m.id, m.sponsor_id AS "sponsorId"
+          FROM members m
+          WHERE m.sponsor_id = ${rootMemberId}
 
-        UNION ALL
-
-        SELECT
-          m.id,
-          m.member_code AS "memberCode",
-          m.full_name AS "fullName",
-          m.doj,
-          m.status,
-          m.sponsor_id,
-          d.level + 1
-        FROM members m
-        INNER JOIN downline d ON m.sponsor_id = d.id
-        WHERE d.level < 10
-      )
-      SELECT
-        d.id,
-        d."memberCode",
-        d."fullName",
-        d.doj,
-        d.status,
-        d.level,
-        sponsor.member_code AS "sponsorCode",
-        plan."committedAmount",
-        COALESCE(direct_counts.count, 0)::int AS "directReferralsCount",
-        COALESCE(team_counts.count, 0)::int AS "totalTeamCount"
-      FROM downline d
-      LEFT JOIN members sponsor ON sponsor.id = d.sponsor_id
-      LEFT JOIN LATERAL (
-        SELECT pp.committed_amount AS "committedAmount"
-        FROM payment_plans pp
-        WHERE pp.member_id = d.id AND pp.status = 'ACTIVE'
-        ORDER BY pp.effective_from DESC
-        LIMIT 1
-      ) plan ON true
-      LEFT JOIN LATERAL (
-        SELECT COUNT(*)::int AS count
-        FROM members m2
-        WHERE m2.sponsor_id = d.id
-      ) direct_counts ON true
-      LEFT JOIN LATERAL (
-        WITH RECURSIVE sub AS (
-          SELECT id FROM members WHERE sponsor_id = d.id
           UNION ALL
-          SELECT m3.id FROM members m3 INNER JOIN sub s ON m3.sponsor_id = s.id
-        )
-        SELECT COUNT(*)::int AS count FROM sub
-      ) team_counts ON true
-      ORDER BY d.level ASC, d."fullName" ASC
-    `;
 
+          SELECT m.id, m.sponsor_id AS "sponsorId"
+          FROM members m
+          INNER JOIN downline d ON m.sponsor_id = d.id
+        )
+        SELECT id, "sponsorId" FROM downline
+      `,
+    ]);
+
+    // Level via BFS from the root (direct children = level 1).
+    const childrenOf = new Map<string, string[]>();
+    for (const e of edges) {
+      if (!e.sponsorId) continue;
+      const list = childrenOf.get(e.sponsorId) ?? [];
+      list.push(e.id);
+      childrenOf.set(e.sponsorId, list);
+    }
+
+    const level = new Map<string, number>();
+    let frontier = childrenOf.get(rootMemberId) ?? [];
+    let depth = 1;
+    while (frontier.length > 0) {
+      for (const id of frontier) level.set(id, depth);
+      const next: string[] = [];
+      for (const id of frontier) next.push(...(childrenOf.get(id) ?? []));
+      frontier = next;
+      depth += 1;
+    }
+
+    // Total team size per node — true unlimited depth, via post-order sum
+    // over the whole real graph (deepest nodes first).
+    const totalTeamCount = new Map<string, number>();
+    const byDepthDesc = [...level.keys()].sort((a, b) => (level.get(b) ?? 0) - (level.get(a) ?? 0));
+    for (const id of byDepthDesc) {
+      const children = childrenOf.get(id) ?? [];
+      const sum = children.reduce((acc, childId) => acc + 1 + (totalTeamCount.get(childId) ?? 0), 0);
+      totalTeamCount.set(id, sum);
+    }
+
+    const displayIds = [...level.entries()].filter(([, lv]) => lv <= 10).map(([id]) => id);
+    if (displayIds.length === 0) {
+      return [];
+    }
+
+    const [members, plans] = await Promise.all([
+      this.prisma.member.findMany({
+        where: { id: { in: displayIds } },
+        select: { id: true, memberCode: true, fullName: true, doj: true, status: true, sponsorId: true },
+      }),
+      this.prisma.paymentPlan.findMany({
+        where: { memberId: { in: displayIds }, status: 'ACTIVE' },
+        orderBy: { effectiveFrom: 'desc' },
+        select: { memberId: true, committedAmount: true },
+      }),
+    ]);
+
+    const codeById = new Map(members.map((m) => [m.id, m.memberCode]));
+    const planByMemberId = new Map<string, string>();
+    for (const p of plans) {
+      if (!planByMemberId.has(p.memberId)) {
+        planByMemberId.set(p.memberId, p.committedAmount.toString());
+      }
+    }
+
+    const rows: GenealogyRow[] = members.map((m) => ({
+      id: m.id,
+      memberCode: m.memberCode,
+      fullName: m.fullName,
+      doj: m.doj,
+      status: m.status,
+      level: level.get(m.id) ?? 0,
+      sponsorCode: m.sponsorId ? (codeById.get(m.sponsorId) ?? root?.memberCode ?? null) : null,
+      committedAmount: planByMemberId.get(m.id) ?? null,
+      directReferralsCount: (childrenOf.get(m.id) ?? []).length,
+      totalTeamCount: totalTeamCount.get(m.id) ?? 0,
+    }));
+
+    rows.sort((a, b) => a.level - b.level || a.fullName.localeCompare(b.fullName));
     return rows;
   }
 }

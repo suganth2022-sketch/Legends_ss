@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Wallet, X } from 'lucide-react';
 import { apiClient } from '../../lib/apiClient';
+import { ErrorBanner } from '../../components/ErrorBanner';
 
 interface PendingPayout {
   id: string;
@@ -31,23 +32,28 @@ export const AdminPayoutQueuePage: React.FC = () => {
   const [pending, setPending] = useState<PendingPayout[]>([]);
   const [history, setHistory] = useState<ReportPayout[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [rejectingId, setRejectingId] = useState<string | null>(null);
   const [rejectNote, setRejectNote] = useState('');
 
   const loadPending = () => {
     setLoading(true);
-    apiClient.get<PendingPayout[]>('/payouts/pending').then((res) => {
-      setPending(res.data);
-      setLoading(false);
-    });
+    setError(null);
+    apiClient
+      .get<PendingPayout[]>('/payouts/pending')
+      .then((res) => setPending(res.data))
+      .catch(() => setError('Could not load pending payouts. Please try again.'))
+      .finally(() => setLoading(false));
   };
 
   const loadHistory = (status: Tab) => {
     setLoading(true);
-    apiClient.get('/admin/reports/payouts', { params: { status, pageSize: 25 } }).then((res) => {
-      setHistory(res.data.data);
-      setLoading(false);
-    });
+    setError(null);
+    apiClient
+      .get('/admin/reports/payouts', { params: { status, pageSize: 25 } })
+      .then((res) => setHistory(res.data.data))
+      .catch(() => setError('Could not load payouts. Please try again.'))
+      .finally(() => setLoading(false));
   };
 
   useEffect(() => {
@@ -96,7 +102,9 @@ export const AdminPayoutQueuePage: React.FC = () => {
         ))}
       </div>
 
-      {tab === 'PENDING' ? (
+      {error ? (
+        <ErrorBanner message={error} onRetry={() => (tab === 'PENDING' ? loadPending() : loadHistory(tab))} />
+      ) : tab === 'PENDING' ? (
         <div className="flex flex-col gap-3.5">
           {!loading && pending.length === 0 && (
             <div className="card p-8 text-center text-ink-faint text-sm">No pending payout requests.</div>

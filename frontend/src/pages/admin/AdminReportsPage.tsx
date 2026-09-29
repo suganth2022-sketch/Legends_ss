@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { apiClient } from '../../lib/apiClient';
+import { ErrorBanner } from '../../components/ErrorBanner';
 
 type ReportTab = 'payments' | 'commissions' | 'payouts' | 'audit';
 
@@ -15,16 +16,23 @@ export const AdminReportsPage: React.FC = () => {
   const [rows, setRows] = useState<any[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
+  const load = () => {
     setLoading(true);
+    setError(null);
     const endpoint = TABS.find((t) => t.id === tab)!.endpoint;
-    apiClient.get(endpoint, { params: { pageSize: 25 } }).then((res) => {
-      setRows(res.data.data);
-      setTotal(res.data.total);
-      setLoading(false);
-    });
-  }, [tab]);
+    apiClient
+      .get(endpoint, { params: { pageSize: 25 } })
+      .then((res) => {
+        setRows(res.data.data);
+        setTotal(res.data.total);
+      })
+      .catch(() => setError('Could not load this report. Please try again.'))
+      .finally(() => setLoading(false));
+  };
+
+  useEffect(load, [tab]);
 
   return (
     <div className="p-8">
@@ -50,6 +58,13 @@ export const AdminReportsPage: React.FC = () => {
         ))}
       </div>
 
+      {error && (
+        <div className="mb-4.5">
+          <ErrorBanner message={error} onRetry={load} />
+        </div>
+      )}
+
+      {!error && (
       <div className="card p-0 py-5.5">
         {loading ? (
           <div className="text-center text-ink-faint py-8 text-sm">Loading…</div>
@@ -173,6 +188,7 @@ export const AdminReportsPage: React.FC = () => {
           </>
         )}
       </div>
+      )}
     </div>
   );
 };

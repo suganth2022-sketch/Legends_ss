@@ -17,6 +17,7 @@ import { AdminLayout } from './layouts/AdminLayout';
 import { AdminDashboardPage } from './pages/admin/AdminDashboardPage';
 import { AdminMembersPage } from './pages/admin/AdminMembersPage';
 import { AdminMemberDetailPage } from './pages/admin/AdminMemberDetailPage';
+import { AdminPaymentsSummaryPage } from './pages/admin/AdminPaymentsSummaryPage';
 import { AdminPayoutQueuePage } from './pages/admin/AdminPayoutQueuePage';
 import { AdminPayoutEntryPage } from './pages/admin/AdminPayoutEntryPage';
 import { AdminPaymentEntryPage } from './pages/admin/AdminPaymentEntryPage';
@@ -54,6 +55,7 @@ function AppRoutes() {
           <Route path="/admin/dashboard" element={<AdminDashboardPage />} />
           <Route path="/admin/members" element={<AdminMembersPage />} />
           <Route path="/admin/members/:id" element={<AdminMemberDetailPage />} />
+          <Route path="/admin/payments" element={<AdminPaymentsSummaryPage />} />
           <Route path="/admin/payouts" element={<AdminPayoutQueuePage />} />
           <Route path="/admin/payout-entry" element={<AdminPayoutEntryPage />} />
           <Route path="/admin/payment-entry" element={<AdminPaymentEntryPage />} />

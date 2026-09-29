@@ -12,16 +12,20 @@ import { PassbookModule } from './passbook/passbook.module';
 import { PayoutsModule } from './payouts/payouts.module';
 import { AdminModule } from './admin/admin.module';
 import { AuditModule } from './audit/audit.module';
+import { ProfileModule } from './profile/profile.module';
 
 // Fail fast rather than silently falling back to a hardcoded secret if
 // these are ever missing (see docs/business-rules.md-adjacent security note
 // — this was a previously-flagged bug: 4 files used to have a hardcoded
 // JWT secret fallback).
 function validateEnv(config: Record<string, unknown>) {
-  for (const key of ['JWT_SECRET', 'JWT_REFRESH_SECRET']) {
+  for (const key of ['JWT_SECRET', 'JWT_REFRESH_SECRET', 'ENCRYPTION_KEY']) {
     if (!config[key]) {
       throw new Error(`Missing required environment variable: ${key}`);
     }
+  }
+  if (typeof config.ENCRYPTION_KEY === 'string' && config.ENCRYPTION_KEY.length !== 64) {
+    throw new Error('ENCRYPTION_KEY must be exactly 64 hex characters (32 bytes)');
   }
   return config;
 }
@@ -43,6 +47,7 @@ function validateEnv(config: Record<string, unknown>) {
     PayoutsModule,
     AdminModule,
     AuditModule,
+    ProfileModule,
   ],
   controllers: [],
   providers: [

@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { apiClient } from '../../lib/apiClient';
+import { ErrorBanner } from '../../components/ErrorBanner';
 
 interface EarningRow {
   sNo: number;
@@ -33,6 +34,7 @@ export const PassbookPage: React.FC = () => {
   const [earnings, setEarnings] = useState<EarningRow[]>([]);
   const [payouts, setPayouts] = useState<PayoutRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const loadEarnings = () => {
     const params: Record<string, string> = {};
@@ -41,10 +43,12 @@ export const PassbookPage: React.FC = () => {
     if (sourceMemberCode) params.sourceMemberCode = sourceMemberCode;
     if (level) params.level = level;
     setLoading(true);
-    apiClient.get<EarningRow[]>('/passbook/earnings', { params }).then((res) => {
-      setEarnings(res.data);
-      setLoading(false);
-    });
+    setError(null);
+    apiClient
+      .get<EarningRow[]>('/passbook/earnings', { params })
+      .then((res) => setEarnings(res.data))
+      .catch(() => setError('Could not load your earnings. Please try again.'))
+      .finally(() => setLoading(false));
   };
 
   const loadPayouts = () => {
@@ -54,10 +58,12 @@ export const PassbookPage: React.FC = () => {
     if (mode) params.mode = mode;
     if (status) params.status = status;
     setLoading(true);
-    apiClient.get<PayoutRow[]>('/passbook/payouts', { params }).then((res) => {
-      setPayouts(res.data);
-      setLoading(false);
-    });
+    setError(null);
+    apiClient
+      .get<PayoutRow[]>('/passbook/payouts', { params })
+      .then((res) => setPayouts(res.data))
+      .catch(() => setError('Could not load your payouts. Please try again.'))
+      .finally(() => setLoading(false));
   };
 
   useEffect(() => {
@@ -151,6 +157,9 @@ export const PassbookPage: React.FC = () => {
         </button>
       </form>
 
+      {error ? (
+        <ErrorBanner message={error} onRetry={tab === 'EARNED' ? loadEarnings : loadPayouts} />
+      ) : (
       <div className="card p-0 py-5.5">
         {tab === 'EARNED' ? (
           <table className="data-table">
@@ -228,6 +237,7 @@ export const PassbookPage: React.FC = () => {
           </table>
         )}
       </div>
+      )}
     </div>
   );
 };

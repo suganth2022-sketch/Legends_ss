@@ -5,24 +5,39 @@ import { apiClient } from '../../lib/apiClient';
 
 export const AdminPayoutEntryPage: React.FC = () => {
   const navigate = useNavigate();
-  const [memberId, setMemberId] = useState('');
-  const [amount, setAmount] = useState(1000);
+  const [memberCode, setMemberCode] = useState('');
+  // String-typed so the field can be genuinely empty while typing — a
+  // number state forces Number('') === 0 the moment the field is cleared,
+  // so the next digit typed appends after a stray "0" (e.g. "5" -> "05").
+  const [amountInput, setAmountInput] = useState('1000');
   const [paymentMode, setPaymentMode] = useState<'UPI' | 'BANK_TRANSFER'>('BANK_TRANSFER');
   const [accountDetails, setAccountDetails] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
+  const amount = Number(amountInput) || 0;
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
     setSuccess(null);
+    if (amount < 1000) {
+      setError('Minimum payout amount is ₹1,000.');
+      return;
+    }
     setSubmitting(true);
     try {
-      const { data } = await apiClient.post('/payouts/manual', { memberId, amount, paymentMode, accountDetails });
+      const { data } = await apiClient.post('/payouts/manual', {
+        memberCode: memberCode.trim().toUpperCase(),
+        amount,
+        paymentMode,
+        accountDetails,
+      });
       setSuccess(`Recorded payout ${data.referenceNo} for ₹${amount.toLocaleString('en-IN')} — status PAID.`);
-      setMemberId('');
+      setMemberCode('');
       setAccountDetails('');
+      setAmountInput('1000');
     } catch (err: any) {
       setError(err?.response?.data?.message || 'Could not record payout.');
     } finally {
@@ -62,10 +77,10 @@ export const AdminPayoutEntryPage: React.FC = () => {
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="text-xs font-bold text-ink-soft block mb-1.5">Member ID</label>
+            <label className="text-xs font-bold text-ink-soft block mb-1.5">Member Code</label>
             <input
-              value={memberId}
-              onChange={(e) => setMemberId(e.target.value)}
+              value={memberCode}
+              onChange={(e) => setMemberCode(e.target.value)}
               placeholder="e.g. A000002"
               className="input text-[13px] font-mono"
               required
@@ -74,10 +89,10 @@ export const AdminPayoutEntryPage: React.FC = () => {
           <div>
             <label className="text-xs font-bold text-ink-soft block mb-1.5">Amount (₹)</label>
             <input
-              type="number"
-              min={1000}
-              value={amount}
-              onChange={(e) => setAmount(Number(e.target.value))}
+              type="text"
+              inputMode="numeric"
+              value={amountInput}
+              onChange={(e) => setAmountInput(e.target.value.replace(/[^\d]/g, ''))}
               className="input text-[15px] font-bold font-mono"
               required
             />

@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Search, ArrowUpDown } from 'lucide-react';
 import { apiClient } from '../../lib/apiClient';
+import { ErrorBanner } from '../../components/ErrorBanner';
 
 interface MemberRow {
   id: string;
@@ -22,18 +23,23 @@ export const AdminMembersPage: React.FC = () => {
   const [page, setPage] = useState(1);
   const [sortDojAsc, setSortDojAsc] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const pageSize = 10;
 
   const load = () => {
     setLoading(true);
+    setError(null);
     const params: Record<string, string | number> = { page, pageSize };
     if (search) params.search = search;
     if (status) params.status = status;
-    apiClient.get('/admin/members', { params }).then((res) => {
-      setRows(res.data.data);
-      setTotal(res.data.total);
-      setLoading(false);
-    });
+    apiClient
+      .get('/admin/members', { params })
+      .then((res) => {
+        setRows(res.data.data);
+        setTotal(res.data.total);
+      })
+      .catch(() => setError('Could not load members. Please try again.'))
+      .finally(() => setLoading(false));
   };
 
   useEffect(load, [page, status]);
@@ -94,6 +100,9 @@ export const AdminMembersPage: React.FC = () => {
         </button>
       </form>
 
+      {error ? (
+        <ErrorBanner message={error} onRetry={load} />
+      ) : (
       <div className="card p-0 py-5.5">
         <table className="data-table">
           <thead>
@@ -170,6 +179,7 @@ export const AdminMembersPage: React.FC = () => {
           </div>
         </div>
       </div>
+      )}
     </div>
   );
 };

@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Wallet, ArrowUpRight, AlertCircle, CheckCircle, Info } from 'lucide-react';
 import { apiClient } from '../../lib/apiClient';
+import { ErrorBanner } from '../../components/ErrorBanner';
 
 interface PayoutRow {
   sNo: number;
@@ -14,22 +15,35 @@ interface PayoutRow {
 export const PayoutPage: React.FC = () => {
   const [balance, setBalance] = useState<string>('0');
   const [history, setHistory] = useState<PayoutRow[]>([]);
-  const [amount, setAmount] = useState(1000);
+  // String-typed so the field can be genuinely empty while typing — a
+  // number state forces Number('') === 0 the moment the field is cleared,
+  // so the next digit typed appends after a stray "0" (e.g. "5" -> "05").
+  const [amountInput, setAmountInput] = useState('1000');
   const [paymentMode, setPaymentMode] = useState<'UPI' | 'BANK_TRANSFER'>('UPI');
   const [accountDetails, setAccountDetails] = useState('');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+
+  const amount = Number(amountInput) || 0;
 
   const loadData = async () => {
-    const [balanceRes, historyRes] = await Promise.all([
-      apiClient.get<{ availableBalance: string }>('/payouts/balance'),
-      apiClient.get<PayoutRow[]>('/passbook/payouts'),
-    ]);
-    setBalance(balanceRes.data.availableBalance);
-    setHistory(historyRes.data);
-    setLoading(false);
+    setLoading(true);
+    setLoadError(null);
+    try {
+      const [balanceRes, historyRes] = await Promise.all([
+        apiClient.get<{ availableBalance: string }>('/payouts/balance'),
+        apiClient.get<PayoutRow[]>('/passbook/payouts'),
+      ]);
+      setBalance(balanceRes.data.availableBalance);
+      setHistory(historyRes.data);
+    } catch {
+      setLoadError('Could not load your payout details. Please try again.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
@@ -43,6 +57,10 @@ export const PayoutPage: React.FC = () => {
 
     if (!accountDetails.trim()) {
       setErrorMsg('Enter your UPI ID or bank account details.');
+      return;
+    }
+    if (amount < 1000) {
+      setErrorMsg('Minimum payout amount is ₹1,000.');
       return;
     }
 
@@ -60,6 +78,14 @@ export const PayoutPage: React.FC = () => {
 
   if (loading) {
     return <div className="p-8 text-ink-soft text-sm">Loading…</div>;
+  }
+
+  if (loadError) {
+    return (
+      <div className="p-8">
+        <ErrorBanner message={loadError} onRetry={loadData} />
+      </div>
+    );
   }
 
   return (
@@ -105,12 +131,13 @@ export const PayoutPage: React.FC = () => {
                 <span className="text-ink-faint">Min ₹1,000 · Max ₹{Number(balance).toLocaleString('en-IN')}</span>
               </label>
               <input
-                type="number"
-                min={1000}
-                max={Number(balance)}
-                step={100}
-                value={amount}
-                onChange={(e) => setAmount(Number(e.target.value))}
+                type="text"
+                inputMode="numeric"
+                value={amountInput}
+                onChange={(e) => {
+                  const digitsOnly = e.target.value.replace(/[^\d]/g, '');
+                  setAmountInput(digitsOnly);
+                }}
                 className="input font-mono text-lg font-bold text-gold"
               />
             </div>

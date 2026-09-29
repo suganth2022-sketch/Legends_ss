@@ -81,12 +81,13 @@ export class PayoutsService {
   }
 
   async recordManualPayout(dto: ManualPayoutDto, adminId: string) {
-    const member = await this.prisma.member.findUnique({ where: { id: dto.memberId } });
+    const member = await this.prisma.member.findUnique({ where: { memberCode: dto.memberCode.toUpperCase() } });
     if (!member) {
       throw new NotFoundException('Member not found');
     }
+    const memberId = member.id;
 
-    const balance = await this.getAvailableBalance(dto.memberId);
+    const balance = await this.getAvailableBalance(memberId);
     if (new Prisma.Decimal(dto.amount).gt(balance)) {
       throw new BadRequestException(
         `Amount exceeds this member's available balance of ₹${balance.toString()}`,
@@ -99,7 +100,7 @@ export class PayoutsService {
 
       const payout = await tx.payout.create({
         data: {
-          memberId: dto.memberId,
+          memberId,
           referenceNo,
           amount: dto.amount,
           paymentMode: dto.paymentMode,
@@ -116,7 +117,7 @@ export class PayoutsService {
           action: 'MANUAL_PAYOUT_ENTRY',
           entityName: 'Payout',
           entityId: payout.id,
-          afterSnapshot: { memberId: dto.memberId, amount: dto.amount, referenceNo },
+          afterSnapshot: { memberId, amount: dto.amount, referenceNo },
         },
       });
 

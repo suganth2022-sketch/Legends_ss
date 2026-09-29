@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { ArrowUp, CreditCard, Copy, Clock, CheckCircle } from 'lucide-react';
 import { apiClient } from '../../lib/apiClient';
 import { useAuth } from '../../context/AuthContext';
+import { ErrorBanner } from '../../components/ErrorBanner';
 
 interface PaymentsMeResponse {
   committedAmount: string | null;
@@ -18,6 +19,11 @@ interface EarningRow {
   earnedAmount: string;
 }
 
+interface PayoutRow {
+  amount: string;
+  status: string;
+}
+
 interface GenealogyRow {
   level: number;
 }
@@ -27,31 +33,42 @@ export const DashboardPage: React.FC = () => {
   const [payments, setPayments] = useState<PaymentsMeResponse | null>(null);
   const [balance, setBalance] = useState<string | null>(null);
   const [earnings, setEarnings] = useState<EarningRow[]>([]);
+  const [payouts, setPayouts] = useState<PayoutRow[]>([]);
   const [genealogy, setGenealogy] = useState<GenealogyRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
-  useEffect(() => {
+  const load = () => {
     if (!user) return;
-    (async () => {
-      const [paymentsRes, balanceRes, earningsRes, genealogyRes] = await Promise.all([
-        apiClient.get<PaymentsMeResponse>('/payments/me'),
-        apiClient.get<{ availableBalance: string }>('/payouts/balance'),
-        apiClient.get<EarningRow[]>('/passbook/earnings'),
-        apiClient.get<GenealogyRow[]>(`/referral/genealogy/${user.id}`),
-      ]);
-      setPayments(paymentsRes.data);
-      setBalance(balanceRes.data.availableBalance);
-      setEarnings(earningsRes.data.slice(0, 4));
-      setGenealogy(genealogyRes.data);
-      setLoading(false);
-    })();
-  }, [user]);
+    setLoading(true);
+    setError(null);
+    Promise.all([
+      apiClient.get<PaymentsMeResponse>('/payments/me'),
+      apiClient.get<{ availableBalance: string }>('/payouts/balance'),
+      apiClient.get<EarningRow[]>('/passbook/earnings'),
+      apiClient.get<PayoutRow[]>('/passbook/payouts'),
+      apiClient.get<GenealogyRow[]>(`/referral/genealogy/${user.id}`),
+    ])
+      .then(([paymentsRes, balanceRes, earningsRes, payoutsRes, genealogyRes]) => {
+        setPayments(paymentsRes.data);
+        setBalance(balanceRes.data.availableBalance);
+        setEarnings(earningsRes.data);
+        setPayouts(payoutsRes.data);
+        setGenealogy(genealogyRes.data);
+      })
+      .catch(() => setError('Could not load your dashboard. Please try again.'))
+      .finally(() => setLoading(false));
+  };
 
-  const totalPaid = payments?.payments.reduce((sum, p) => sum + Number(p.amount), 0) ?? 0;
+  useEffect(load, [user]);
+
+  const totalPaidIn = payments?.payments.reduce((sum, p) => sum + Number(p.amount), 0) ?? 0;
   const monthsPaid = payments?.payments.length ?? 0;
   const directCount = genealogy.filter((r) => r.level === 1).length;
   const totalTeam = genealogy.length;
+  const totalCommissionEarned = earnings.reduce((sum, e) => sum + Number(e.earnedAmount), 0);
+  const totalCommissionPaid = payouts.filter((p) => p.status === 'PAID').reduce((sum, p) => sum + Number(p.amount), 0);
   const referralLink = `${window.location.origin}/register?ref=${user?.memberCode}`;
 
   const handleCopy = () => {
@@ -64,13 +81,23 @@ export const DashboardPage: React.FC = () => {
     return <div className="p-8 text-ink-soft text-sm">Loading dashboard…</div>;
   }
 
+  if (error) {
+    return (
+      <div className="p-8">
+        <ErrorBanner message={error} onRetry={load} />
+      </div>
+    );
+  }
+
+  const recentEarnings = earnings.slice(0, 4);
+
   return (
     <div className="p-8 flex flex-col gap-5">
       {/* Stat tiles */}
-      <div className="grid grid-cols-4 gap-4">
+      <div className="grid grid-cols-3 gap-4">
         <div className="card p-5">
           <div className="text-xs font-semibold text-ink-soft">Total Savings Paid</div>
-          <div className="font-display text-[26px] font-bold mt-1.5">₹{totalPaid.toLocaleString('en-IN')}</div>
+          <div className="font-display text-[26px] font-bold mt-1.5">₹{totalPaidIn.toLocaleString('en-IN')}</div>
           <div className="text-[11.5px] text-state-green mt-1">{monthsPaid} month{monthsPaid === 1 ? '' : 's'} paid</div>
         </div>
         <div className="card p-5">
@@ -80,19 +107,33 @@ export const DashboardPage: React.FC = () => {
           </div>
           <div className="text-[11.5px] text-ink-faint mt-1">locked at first payment</div>
         </div>
-        <div className="card p-5 border-[1.5px] border-gold-soft bg-gradient-to-b from-white to-[#FCF7EC]">
-          <div className="text-xs font-semibold text-ink-soft">Available Balance</div>
-          <div className="font-display text-[26px] font-bold mt-1.5 text-gold">
-            ₹{Number(balance ?? 0).toLocaleString('en-IN')}
-          </div>
-          <div className="text-[11.5px] text-ink-faint mt-1">SUM(commission) − SUM(payouts)</div>
-        </div>
         <div className="card p-5">
           <div className="text-xs font-semibold text-ink-soft">Network</div>
           <div className="font-display text-[26px] font-bold mt-1.5">
             {directCount} <span className="text-sm font-sans font-semibold text-ink-faint">direct</span>
           </div>
           <div className="text-[11.5px] text-ink-faint mt-1">{totalTeam} total team members</div>
+        </div>
+        <div className="card p-5">
+          <div className="text-xs font-semibold text-ink-soft">Total Commission Earned</div>
+          <div className="font-display text-[26px] font-bold mt-1.5 text-gold">
+            ₹{totalCommissionEarned.toLocaleString('en-IN')}
+          </div>
+          <div className="text-[11.5px] text-ink-faint mt-1">lifetime, all levels</div>
+        </div>
+        <div className="card p-5">
+          <div className="text-xs font-semibold text-ink-soft">Total Commission Paid</div>
+          <div className="font-display text-[26px] font-bold mt-1.5 text-gold">
+            ₹{totalCommissionPaid.toLocaleString('en-IN')}
+          </div>
+          <div className="text-[11.5px] text-ink-faint mt-1">payouts actually disbursed</div>
+        </div>
+        <div className="card p-5 border-[1.5px] border-gold-soft bg-gradient-to-b from-white to-[#FCF7EC]">
+          <div className="text-xs font-semibold text-ink-soft">Available Balance</div>
+          <div className="font-display text-[26px] font-bold mt-1.5 text-gold">
+            ₹{Number(balance ?? 0).toLocaleString('en-IN')}
+          </div>
+          <div className="text-[11.5px] text-ink-faint mt-1">SUM(commission) − SUM(payouts)</div>
         </div>
       </div>
 
@@ -106,8 +147,8 @@ export const DashboardPage: React.FC = () => {
             </Link>
           </div>
           <div className="flex flex-col">
-            {earnings.length === 0 && <div className="text-sm text-ink-faint py-4">No earnings yet.</div>}
-            {earnings.map((r) => (
+            {recentEarnings.length === 0 && <div className="text-sm text-ink-faint py-4">No earnings yet.</div>}
+            {recentEarnings.map((r) => (
               <div key={r.sNo} className="flex items-center justify-between py-3 border-b border-line last:border-none">
                 <div className="flex items-center gap-3">
                   <div className="w-[34px] h-[34px] rounded-lg bg-state-green-soft flex items-center justify-center text-state-green">

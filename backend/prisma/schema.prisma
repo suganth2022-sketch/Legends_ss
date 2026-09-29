@@ -158,6 +158,7 @@ model MemberBankDetails {
   id                     String   @id @default(uuid())
   memberId               String   @unique @map("member_id")
   bankName               String   @map("bank_name")
+  branch                 String?
   accountNumberEncrypted String   @map("account_number_encrypted")
   ifscCode               String   @map("ifsc_code")
   upiId                  String?  @map("upi_id")
@@ -178,7 +179,9 @@ model Nominee {
   fullName     String   @map("full_name")
   relationship String
   phone        String?
+  email        String?
   createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
 
   member       Member   @relation(fields: [memberId], references: [id], onDelete: Cascade)
 

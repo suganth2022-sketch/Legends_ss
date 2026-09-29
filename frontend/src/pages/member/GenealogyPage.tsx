@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Search } from 'lucide-react';
 import { apiClient } from '../../lib/apiClient';
 import { useAuth } from '../../context/AuthContext';
+import { ErrorBanner } from '../../components/ErrorBanner';
 
 interface GenealogyRow {
   id: string;
@@ -9,53 +10,69 @@ interface GenealogyRow {
   fullName: string;
   doj: string;
   status: string;
-  level: number;
+  level: number; // backend: 1 = direct referral
   sponsorCode: string | null;
   committedAmount: string | null;
   directReferralsCount: number;
   totalTeamCount: number;
 }
 
+// Display convention matches the rest of the app (Commission Rules,
+// business-rules.md): Level 1 = yourself, Level 2 = your direct referral,
+// ... Level 10 = the deepest tier. The backend numbers hops-from-you
+// starting at 1 for a direct referral, so we shift by one for display,
+// folding the rare 9th/10th backend hop into one "Level 10" bucket so the
+// visible range stays a clean 2–10 instead of introducing an off-model 11.
+const toDisplayLevel = (backendLevel: number) => Math.min(backendLevel + 1, 10);
+
 const LEVEL_COLORS: Record<number, string> = {
-  1: '#C8102E',
-  2: '#8B0F24',
+  2: '#C8102E',
   3: '#8B0F24',
   4: '#8B0F24',
   5: '#8B0F24',
-  6: '#A87C1F',
+  6: '#8B0F24',
   7: '#A87C1F',
   8: '#A87C1F',
   9: '#A87C1F',
   10: '#C9BDBB',
 };
 
+const DISPLAY_LEVELS = [2, 3, 4, 5, 6, 7, 8, 9, 10];
+
 export const GenealogyPage: React.FC = () => {
   const { user } = useAuth();
   const [rows, setRows] = useState<GenealogyRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [levelFilter, setLevelFilter] = useState<number | 'ALL'>('ALL');
 
-  useEffect(() => {
+  const load = () => {
     if (!user) return;
-    apiClient.get<GenealogyRow[]>(`/referral/genealogy/${user.id}`).then((res) => {
-      setRows(res.data);
-      setLoading(false);
-    });
-  }, [user]);
+    setLoading(true);
+    setError(null);
+    apiClient
+      .get<GenealogyRow[]>(`/referral/genealogy/${user.id}`)
+      .then((res) => setRows(res.data))
+      .catch(() => setError('Could not load your network. Please try again.'))
+      .finally(() => setLoading(false));
+  };
+
+  useEffect(load, [user]);
 
   const levelCounts = useMemo(() => {
-    const counts = Array.from({ length: 10 }, (_, i) => ({ n: i + 1, count: 0 }));
+    const counts = new Map(DISPLAY_LEVELS.map((n) => [n, 0]));
     rows.forEach((r) => {
-      if (r.level >= 1 && r.level <= 10) counts[r.level - 1].count += 1;
+      const lv = toDisplayLevel(r.level);
+      counts.set(lv, (counts.get(lv) ?? 0) + 1);
     });
-    return counts;
+    return DISPLAY_LEVELS.map((n) => ({ n, count: counts.get(n) ?? 0 }));
   }, [rows]);
 
   const maxCount = Math.max(1, ...levelCounts.map((l) => l.count));
 
   const filteredRows = rows.filter((r) => {
-    if (levelFilter !== 'ALL' && r.level !== levelFilter) return false;
+    if (levelFilter !== 'ALL' && toDisplayLevel(r.level) !== levelFilter) return false;
     if (search && !r.fullName.toLowerCase().includes(search.toLowerCase()) && !r.memberCode.toLowerCase().includes(search.toLowerCase())) {
       return false;
     }
@@ -66,6 +83,14 @@ export const GenealogyPage: React.FC = () => {
 
   if (loading) {
     return <div className="p-8 text-ink-soft text-sm">Loading network…</div>;
+  }
+
+  if (error) {
+    return (
+      <div className="p-8">
+        <ErrorBanner message={error} onRetry={load} />
+      </div>
+    );
   }
 
   return (
@@ -91,10 +116,10 @@ export const GenealogyPage: React.FC = () => {
 
       <div className="card p-6">
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-[15.5px] font-bold">Network Depth · Level 1&ndash;10</h3>
-          <span className="text-[11.5px] text-ink-faint">Level 1 = your direct referrals</span>
+          <h3 className="text-[15.5px] font-bold">Network Depth · Level 2&ndash;10</h3>
+          <span className="text-[11.5px] text-ink-faint">Level 1 is you · Level 2 = your direct referrals</span>
         </div>
-        <div className="grid grid-cols-10 gap-2">
+        <div className="grid grid-cols-9 gap-2">
           {levelCounts.map((lv) => (
             <div key={lv.n} className="text-center">
               <div
@@ -130,7 +155,7 @@ export const GenealogyPage: React.FC = () => {
               className="px-3 py-2 rounded-lg border-2 border-line text-[12.5px] text-ink-soft"
             >
               <option value="ALL">All Levels</option>
-              {Array.from({ length: 10 }, (_, i) => i + 1).map((n) => (
+              {DISPLAY_LEVELS.map((n) => (
                 <option key={n} value={n}>
                   Level {n}
                 </option>
@@ -167,7 +192,7 @@ export const GenealogyPage: React.FC = () => {
                 <td className="font-mono text-ink-soft">{new Date(r.doj).toLocaleDateString('en-IN')}</td>
                 <td className="font-bold">{r.committedAmount ? `₹${Number(r.committedAmount).toLocaleString('en-IN')}` : '—'}</td>
                 <td className="font-mono text-ink-soft">{r.sponsorCode ?? '—'}</td>
-                <td>{r.level}</td>
+                <td>{toDisplayLevel(r.level)}</td>
                 <td>{r.directReferralsCount}</td>
                 <td>{r.totalTeamCount}</td>
                 <td>

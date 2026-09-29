@@ -15,14 +15,15 @@ export class PaymentsService {
   // locks their recurring monthly plan amount (SRS §7); every later payment
   // must match that locked amount exactly.
   async recordManualPayment(dto: ManualPaymentDto, adminId: string) {
-    const member = await this.prisma.member.findUnique({ where: { id: dto.memberId } });
+    const member = await this.prisma.member.findUnique({ where: { memberCode: dto.memberCode.toUpperCase() } });
     if (!member) {
       throw new NotFoundException('Member not found');
     }
+    const memberId = member.id;
 
     const payment = await this.prisma.$transaction(async (tx) => {
       const activePlan = await tx.paymentPlan.findFirst({
-        where: { memberId: dto.memberId, status: 'ACTIVE' },
+        where: { memberId, status: 'ACTIVE' },
         orderBy: { effectiveFrom: 'desc' },
       });
 
@@ -33,7 +34,7 @@ export class PaymentsService {
           );
         }
         await tx.paymentPlan.create({
-          data: { memberId: dto.memberId, committedAmount: dto.amount },
+          data: { memberId, committedAmount: dto.amount },
         });
       } else if (Number(activePlan.committedAmount) !== dto.amount) {
         throw new BadRequestException(
@@ -45,7 +46,7 @@ export class PaymentsService {
 
       const created = await tx.payment.create({
         data: {
-          memberId: dto.memberId,
+          memberId,
           amount: dto.amount,
           status: 'SUCCESS',
           mode: 'MANUAL_ADMIN',

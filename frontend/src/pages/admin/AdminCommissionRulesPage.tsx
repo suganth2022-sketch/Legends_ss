@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { apiClient } from '../../lib/apiClient';
+import { ErrorBanner } from '../../components/ErrorBanner';
 
 interface Rule {
   id: string;
@@ -11,15 +12,19 @@ interface Rule {
 export const AdminCommissionRulesPage: React.FC = () => {
   const [rules, setRules] = useState<Rule[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [editingLevel, setEditingLevel] = useState<number | null>(null);
   const [newRate, setNewRate] = useState('');
   const [error, setError] = useState<string | null>(null);
 
   const load = () => {
-    apiClient.get<Rule[]>('/commission/rules').then((res) => {
-      setRules(res.data.sort((a, b) => a.level - b.level));
-      setLoading(false);
-    });
+    setLoading(true);
+    setLoadError(null);
+    apiClient
+      .get<Rule[]>('/commission/rules')
+      .then((res) => setRules(res.data.sort((a, b) => a.level - b.level)))
+      .catch(() => setLoadError('Could not load commission rules. Please try again.'))
+      .finally(() => setLoading(false));
   };
 
   useEffect(load, []);
@@ -38,6 +43,14 @@ export const AdminCommissionRulesPage: React.FC = () => {
 
   if (loading) {
     return <div className="p-8 text-ink-soft text-sm">Loading…</div>;
+  }
+
+  if (loadError) {
+    return (
+      <div className="p-8">
+        <ErrorBanner message={loadError} onRetry={load} />
+      </div>
+    );
   }
 
   return (

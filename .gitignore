@@ -38,3 +38,8 @@ prisma/*.db
 *.local
 coverage/
 .cache/
+
+# Legends_ss is its own separate git repository (already pushed to its own
+# GitHub remote) that happens to live inside this folder — excluded here so
+# `git add` doesn't try to fold it in as a submodule/gitlink.
+Legends_ss/

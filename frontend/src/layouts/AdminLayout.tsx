@@ -9,6 +9,7 @@ import {
   Megaphone,
   FileText,
   LogOut,
+  IndianRupee,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { Logo } from '../components/Logo';
@@ -16,6 +17,7 @@ import { Logo } from '../components/Logo';
 const NAV_ITEMS = [
   { to: '/admin/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { to: '/admin/members', label: 'Members', icon: Users },
+  { to: '/admin/payments', label: 'Payments', icon: IndianRupee },
   { to: '/admin/payment-entry', label: 'Payment Entry', icon: Receipt },
   { to: '/admin/payouts', label: 'Payout Queue', icon: Wallet },
   { to: '/admin/commission-rules', label: 'Commission Rules', icon: SlidersHorizontal },

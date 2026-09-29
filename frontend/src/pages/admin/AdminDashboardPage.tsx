@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Users, Wallet, Receipt, ArrowRight } from 'lucide-react';
 import { apiClient } from '../../lib/apiClient';
+import { ErrorBanner } from '../../components/ErrorBanner';
 
 interface AuditLog {
   id: string;
@@ -18,23 +19,37 @@ export const AdminDashboardPage: React.FC = () => {
   const [pendingPayouts, setPendingPayouts] = useState(0);
   const [logs, setLogs] = useState<AuditLog[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    (async () => {
-      const [membersRes, pendingRes, logsRes] = await Promise.all([
-        apiClient.get('/admin/members', { params: { pageSize: 1 } }),
-        apiClient.get('/payouts/pending'),
-        apiClient.get('/admin/audit-logs', { params: { pageSize: 8 } }),
-      ]);
-      setMemberCount(membersRes.data.total);
-      setPendingPayouts(pendingRes.data.length);
-      setLogs(logsRes.data.data);
-      setLoading(false);
-    })();
-  }, []);
+  const load = () => {
+    setLoading(true);
+    setError(null);
+    Promise.all([
+      apiClient.get('/admin/members', { params: { pageSize: 1 } }),
+      apiClient.get('/payouts/pending'),
+      apiClient.get('/admin/audit-logs', { params: { pageSize: 8 } }),
+    ])
+      .then(([membersRes, pendingRes, logsRes]) => {
+        setMemberCount(membersRes.data.total);
+        setPendingPayouts(pendingRes.data.length);
+        setLogs(logsRes.data.data);
+      })
+      .catch(() => setError('Could not load the dashboard. Please try again.'))
+      .finally(() => setLoading(false));
+  };
+
+  useEffect(load, []);
 
   if (loading) {
     return <div className="p-8 text-ink-soft text-sm">Loading…</div>;
+  }
+
+  if (error) {
+    return (
+      <div className="p-8">
+        <ErrorBanner message={error} onRetry={load} />
+      </div>
+    );
   }
 
   return (
