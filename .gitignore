@@ -1,45 +1,43 @@
-# Dependencies
-node_modules/
-
-# Build output
-dist/
-dist-ssr/
-build/
-
-# Environment / secrets
+# ---- secrets: only *.example files are ever committed -------------------------
 .env
-.env.local
-.env.*.local
-*.env
+.env.*
+!.env.example
+*.pem
+*.key
 
-# Logs
-logs/
-*.log
+# ---- Python ----------------------------------------------------------------------
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# ---- Node / Next.js ---------------------------------------------------------------
+node_modules/
+.next/
+out/
+next-env.d.ts
+*.tsbuildinfo
 npm-debug.log*
-yarn-debug.log*
-pnpm-debug.log*
 
-# Editor / OS
+# ---- Local databases / logs -------------------------------------------------------
+*.db
+*.sqlite3
+*.log
+logs/
+
+# ---- Editor / OS ------------------------------------------------------------------
 .vscode/*
+!.vscode/settings.json
 !.vscode/extensions.json
 .idea/
 .DS_Store
 Thumbs.db
-*.suo
-*.sw?
-
-# Prisma
-prisma/*.db
 
 # Claude Code local (per-developer) settings
 .claude/settings.local.json
-
-# Misc
-*.local
-coverage/
-.cache/
-
-# Legends_ss is its own separate git repository (already pushed to its own
-# GitHub remote) that happens to live inside this folder — excluded here so
-# `git add` doesn't try to fold it in as a submodule/gitlink.
-Legends_ss/

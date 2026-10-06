@@ -1,5 +1,7 @@
+'use client';
+
 import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
-import { apiClient, tokenStorage } from '../lib/apiClient';
+import { apiClient } from '@/lib/apiClient';
 
 export type UserType = 'MEMBER' | 'ADMIN';
 
@@ -34,15 +36,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState(true);
 
   const hydrate = useCallback(async () => {
-    if (!tokenStorage.getAccessToken()) {
-      setLoading(false);
-      return;
-    }
     try {
       const { data } = await apiClient.get<AuthUser>('/auth/me');
       setUser(data);
     } catch {
-      tokenStorage.clear();
       setUser(null);
     } finally {
       setLoading(false);
@@ -57,21 +54,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return () => window.removeEventListener('legends:logout', onLogout);
   }, [hydrate]);
 
+  // Login/logout hit dedicated Next route handlers that own the httpOnly cookies.
   const loginMember = useCallback(async (identifier: string, password: string) => {
-    const { data } = await apiClient.post('/auth/login', { identifier, password });
-    tokenStorage.setTokens(data.accessToken, data.refreshToken);
-    setUser({ ...data.user, userType: 'MEMBER' });
+    const { data } = await apiClient.post('/api/auth/login', { kind: 'MEMBER', identifier, password }, { baseURL: '' });
+    setUser(data.user);
   }, []);
 
   const loginAdmin = useCallback(async (username: string, password: string) => {
-    const { data } = await apiClient.post('/auth/admin/login', { username, password });
-    tokenStorage.setTokens(data.accessToken, data.refreshToken);
-    setUser({ ...data.user, userType: 'ADMIN' });
+    const { data } = await apiClient.post('/api/auth/login', { kind: 'ADMIN', username, password }, { baseURL: '' });
+    setUser(data.user);
   }, []);
 
   const logout = useCallback(() => {
-    tokenStorage.clear();
     setUser(null);
+    apiClient.post('/api/auth/logout', undefined, { baseURL: '' }).finally(() => {
+      window.location.assign('/login');
+    });
   }, []);
 
   return (
